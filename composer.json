@@ -1,18 +1,18 @@
 {
-  "name": "limen/redisun",
+  "name": "luminee/redisun",
   "description": "Make redis manipulations easy. Unify commands for all data types.",
   "type": "library",
   "keywords": [
+    "laravel",
     "redis",
-    "lua",
     "eval",
     "sql",
     "orm"
   ],
-  "homepage": "https://github.com/limen/redisun",
+  "homepage": "https://github.com/luminee/redisun",
   "authors": [
     {
-      "name": "LI Mengxiang",
+      "name": "LI Mengxiang | LuminEe",
       "email": "limengxiang876@gmail.com",
       "homepage": "https://github.com/limen"
     }
@@ -29,5 +29,6 @@
     "psr-4": {
       "Limen\\Redisun\\": "src/"
     }
-  }
+  },
+  "minimum-stability": "dev"
 }

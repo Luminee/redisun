@@ -1,47 +1,43 @@
-# Make redis manipulations easy. Unify commands for all data types.
+# 让redis操作更简单，为不同数据类型封装统一的命令
 
 [![Build Status](https://travis-ci.org/limen/redisun.svg?branch=master)](https://travis-ci.org/limen/redisun)
 [![Packagist](https://img.shields.io/packagist/l/limen/redisun.svg?maxAge=2592000)](https://packagist.org/packages/limen/redisun)
 
-[中文](https://github.com/limen/redisun/blob/master/README.cn.md)
-
+[English](https://github.com/limen/redisun/blob/master/README.cn.md)
 [Wiki](https://github.com/limen/redisun/wiki)
 
-[Python version](https://github.com/limen/redisun-py)
+## 特性
 
-## Features
++ 为不同的数据类型封装了统一的命令，支持常用的5种数据类型：string, hash, list, set, zset
++ 支持类似SQL的查询方法，如where、where in等
++ 使用eval降低在网络通信上的时间消耗
++ "set"类命令均支持修改key的ttl或保留当前ttl
 
-+ Unified commands for all data types: string, list, hash, set and zset.
-+ support SQL like query
-+ use "eval" to save time consumption on network.
-+ "set" like commands all support to set new ttl or keep current ttl
+## 已封装的命令
++ create: 创建key
++ createNotExists: 当key不存在时创建
++ createExists: 当key存在时创建
++ insert: 类似create，支持披批量创建
++ insertNotExists: 批量创建，当所有key不存在时才创建
++ insertExists: 批量创建，当所有key存在时才创建
++ get: 批量获取key
++ getAndSet: 获取key并设置新值
++ find: 获取单个key
++ findBatch: 批量获取
++ update: 批量更新
++ destroy: 删除key
++ destroyBatch: 批量删除
++ delete: 批量删除
 
-## Unified commands
+## 安装
 
-+ create: create key
-+ createNotExists: create key when which not exists
-+ createExists: create key when which exists
-+ insert: similar to create except supporting multiple keys
-+ insertNotExists: similar to createNotExists
-+ insertExists: similar to createExists
-+ get: get key to replace get, lrange, hgetall, smembers and zrange
-+ getAndSet: get key and set new value
-+ find: similar to get
-+ findBatch: find batch
-+ update: update keys
-+ destroy: remove one key
-+ destroyBatch: remove keys
-+ delete: remove keys
-
-## Installation
-
-Recommend to install via [composer](https://getcomposer.org/ "").
+推荐使用[composer](https://getcomposer.org/ "")安装
 
 ```bash
 composer require "limen/redisun"
 ```
 
-## Usage
+## 使用
 
 ```
 use Limen\Redisun\Examples\HashModel;
@@ -55,10 +51,10 @@ $person = [
 ];
 $hashModel = new HashModel();
 $hashModel->create(1, $person);
-$hashModel->find(1);                    // return $person
-$hashModel->where('id',1)->first();     // return $person
-$hashModel->where('id',1)->get();       // return ['redisun:1:hash' => $person]
-$hashModel->where('id',1)->delete();    // remove key "redisun:1:hash" from database
+$hashModel->find(1);                    // 返回 $person
+$hashModel->where('id',1)->first();     // 返回 $person
+$hashModel->where('id',1)->get();       // 返回 ['redisun:1:hash' => $person]
+$hashModel->where('id',1)->delete();    // 从redis数据库删除"redisun:1:hash"
 
 $nick = 'martin-walk';
 
@@ -67,61 +63,61 @@ $stringModel->insert([
     'id' => 1,
     'name' => 'martin'
 ], $nick);
-$stringModel->where('id',1)->first();   // return $nick
-$stringModel->where('id',1)->get();     // return ['redisun:1:string:martin' => $nick]
+$stringModel->where('id',1)->first();   // 返回 $nick
+$stringModel->where('id',1)->get();     // 返回 ['redisun:1:string:martin' => $nick]
 ```
 
-## Concepts
+## 概念
 
-#### _Key representation_
+#### _Key表征_
 
-Every model has its own key representation which tells how to build query keys. For example
+每一个Model都有自己的key表征。查询时依据key表征来构造key。例如
  
 ```
 school:{schoolId}:class:{classId}:members
 ```
 
-We can use where clauses to query the Redis.
+对于拥有这个key表征的Model，我们可以使用where和where in来查询redis
 
 ```
 $model->where('schoolId',1)->whereIn('classId',[1,2])->get();
 ```
 
-The keys to query are
+最终构造出的key如下。这也是将要向redis查询的key
 
 ```
 school:1:class:1:members
 school:1:class:2:members
 ```
 
-#### _Key field_
+#### _Key域_
 
-Key field is a dynamic part of the key representation. 
+Key域是key表征中的动态部分。
 
-Take the key representation above, it has two fields
+以上面的key表征为例，它有两个域
 
 + schoolId
 + classId
 
-#### _Complete key_
+#### _完全key_
 
-When a key has no unbound field, we treat it as complete. For example
+一个构造出的key不包含未绑定的域时，这个key被认为是完全的。例如
 
 ```
 school:1:class:2:members
 ```
 
-On the contrary, an incomplete key is similar to
+相反，一个不完全的key类似于
 
 ```
 school:1:class:{classId}:members
 ```
 
-## Returned data set
+## 返回的数据集
 
-The returned data set would be an associated array whose indices are the query keys.
+批量查询时，返回的数据集是由key索引的关联数组，索引对应的值为key对应的值。
 
-When both keys exist on Redis database, the returned data set would be
+当上面构造出的两个key都存在时，返回的数据集如下
 
 ```
 [
@@ -130,26 +126,26 @@ When both keys exist on Redis database, the returned data set would be
 ]
 ```
 
-If a key not exist, the equivalent index would be not set.
+如果某个key不存在，数据集的索引将没有该key
 
-The returned item's data type depends on the model's type which could be string, hash, list, set or zset.
+数据集中元素的值的类型，根据不同的redis数据类型，可以是
 
-+ string: string
-+ hash: associated array
-+ list: array
-+ set: array
-+ zset: array
++ string: 字符串
++ hash: 关联数组
++ list: 数组
++ set: 数组
++ zset: 数组
 
 
-## Methods
+## 命令手册
 
 ### create
 
-Can use when a model's key representation has only one dynamic field as its primary field.
+当一个model的key表征只有一个域时，可以使用该方法
 
-The item's ttl is optional.
+ttl参数可选。
 
-Hash type with key representation
+key表征如下的Hash类型的Model
 ```
 user:{id}:info
 ```
@@ -158,32 +154,35 @@ user:{id}:info
 $model->create(1, [
     'name' => 'maria',
     'age' => 22,
-], 10);   // the item "user:1:info" would expire after 10 seconds
+], 10);   // key "user:1:info" 将在10s后过期
 ```
 
-zset type with key representation
+key表征如下的Zset类型的Model
 ```
 shop:{id}:customers
 ```
 
 ```
-// key -> member, value -> score
+// key -> 成员, value -> 分值
 $model->create(1, [
     'maria' => 1,
     'martin' => 2,
-]);   // the item "shop:1:customers" would not expire
+]);   // "shop:1:customers"将不会过期
 ```
 
-### createExists
-Similar to "setxx" but supports more data types: string, hash, set, zset and list.
-
 ### createNotExists
-Similar to "setnx" but supports more data types.
+
+类似setnx，支持多种数据类型
+
+### createExists
+
+类似setxx，支持多种数据类型
 
 ### insert
 
-An optional parameter make it possible to insert like "setnx" and "setxx".
-String type with key representation. 
+可选参数用于检查key是否存在，使insert的行为类似setnx或setxx.
+
+key表征如下的Zset类型的Model
 
 ```
 user:{id}:code
@@ -192,19 +191,19 @@ user:{id}:code
 ```
 $model->insert([
     'id' => 1,
-], 10010, 20); // the item "user:1:code" would expire after 20 seconds 
+], 10010, 20); 
 ```
-
-### insertExists
-
-Similar to createExists
 
 ### insertNotExists
 
-Similar to createNotExists
+类似createNotExists
+
+### insertExists
+
+类似createExists
 
 ### find
-Can use when a model's key representation has only one dynamic field as its primary field.
+使用条件同create
 
 ```
 $model->find(1);
@@ -212,7 +211,8 @@ $model->find(1);
 
 ### findBatch
 
-Similar to find. The returned data set are indexed by ids.
+类型于find，返回的数据集由"id"索引
+
 ```
 $model->findBatch([1,2,3]);
 // [
@@ -224,9 +224,11 @@ $model->findBatch([1,2,3]);
 
 ### updateBatch
 
-Similar to findBatch.
+类似于findBatch.
 
-The key would be created if not exist. The key's ttl would not be modified if the ttl parameter not set.
+不存在的key将被创建。
+
+如果不传入ttl参数，key的ttl将不被改变。
 
 ```
 $model->updateBatch([1,2,3], $value);
@@ -234,20 +236,19 @@ $model->updateBatch([1,2,3], $value);
 
 ### all
 
-key representation
-
+key表征如下的model
 ```
 user:{id}:code
 ```
 
 ```
-$model->all();      // return all keys which match pattern "user:*:code"
+$model->all();      // 返回匹配模式user:*:code（keys user:*:code）的所有key的值
 ```
 
 
 ### where
 
-Similar to SQL
+绑定一个key域
 
 ```
 $model->where('id', 1)->where('name', 'maria');
@@ -255,7 +256,7 @@ $model->where('id', 1)->where('name', 'maria');
 
 ### whereIn
 
-Similar to where
+类似于where，为一个key域绑定多个值
 
 ```
 $model->whereIn('id', [1,2,3]);
@@ -263,7 +264,7 @@ $model->whereIn('id', [1,2,3]);
 
 ### first
 
-Get first exist item from query keys. Return null when all query keys not exist.
+获取构造出的key中第一个存在的key，如果所有构造的key都不存在，返回null
 
 ```
 $model->whereIn('id', [1,2,3])->first();    // return string|array|null
@@ -271,7 +272,9 @@ $model->whereIn('id', [1,2,3])->first();    // return string|array|null
 
 ### update
 
-The key would be created if not exist. The key's ttl would not be modified if the ttl parameter not set.
+如果key不存在，将被创建
+
+如果不传入ttl参数，key的ttl将不被改变。
 
 ```
 $model->where('id',1)->update($value);
@@ -279,7 +282,7 @@ $model->where('id',1)->update($value);
 
 ### delete
 
-Delete query keys.
+删除构造的key
 
 ```
 $model->where('id',1)->delete();
@@ -287,7 +290,8 @@ $model->where('id',1)->delete();
 
 ### orderBy, sort
 
-string type with key representation
+用户对返回的数据集进行排序。
+key表征如下的string类型的Model
 
 ```
 user:{id}:code
@@ -329,15 +333,15 @@ $model->newQuery()->whereIn('id', [1,2])->sort();
 
 ### count
 
-Count the exist query keys.
+返回存在的key的数量。
 
 ```
-$model->where('id', 1)->count();    // return an integer
+$model->where('id', 1)->count();    // 返回整数
 ```
 
 ### max
 
-Get the maximum item in the returned data set.
+返回数据集中的最大值
 
 ```
 $model->where('id', 1)->max();
@@ -345,7 +349,7 @@ $model->where('id', 1)->max();
 
 ### min
 
-Get the minimum item in the returned data set.
+返回数据集中的最小值
 
 ```
 $model->where('id', 1)->min();
@@ -353,15 +357,15 @@ $model->where('id', 1)->min();
 
 ### sum
 
-Get the sum of the returned data set.
+返回查询到的数据集的和
 
 ```
 $model->where('id', 1)->sum();
 ```
 
-## Predis native methods
+## Predis的原生方法
 
-Predis native methods such as "sadd", "hset" can use when the query contains only one complete query key.
+当一个查询只构造出一个完整的key时，可以使用Predis的原生方法，例如
     
     // string model
     $model->where('id', 1)->set('maria');
@@ -371,17 +375,17 @@ Predis native methods such as "sadd", "hset" can use when the query contains onl
         'name' => 'Maria',
         'age' => '22',
     ]);
-    // equals to
+    // 等同于
     $model->where('id', 1)->hmset([
         'name' => 'Maria',
         'age' => '22',
     ]);
 
-## Query builder
+## 查询构造器
 
-Taking the job to build query keys for model.
+负责为model构造待查询的key
 
-key representation
+key表征
 
 ```
 user:{id}:{name}
@@ -389,24 +393,22 @@ user:{id}:{name}
 
 ```php
 $queryBuilder->whereIn('id', [1,2])->whereIn('name', ['maria', 'cat']);
-// built keys
+// 构造出的key
 // user:1:maria
 // user:1:cat
 // user:2:maria
 // user:2:cat
 
 $queryBuilder->refresh()->whereIn('id', [1,2]);
-// built keys
+// 构造出的key
 // user:1:{name}
 // user:2:{name}
 ```
 
-## Development
+## 开发
 
-### Test
+### 测试
 
 ```bash
 $ phpunit --bootstrap tests/bootstrap.php tests/
 ```
-
-

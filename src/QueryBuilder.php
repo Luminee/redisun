@@ -9,6 +9,7 @@
  */
 
 namespace Limen\Redisun;
+
 use \Exception;
 
 /**
@@ -51,7 +52,7 @@ class QueryBuilder
 
     /**
      * QueryBuilder constructor.
-     * @param string $key       e.g. user:{id}:name
+     * @param string $key e.g. user:{id}:name
      */
     public function __construct($key)
     {
@@ -59,8 +60,8 @@ class QueryBuilder
     }
 
     /**
-     * @param string $field     e.g. id
-     * @param string $needle    e.g. {id}
+     * @param string $field e.g. id
+     * @param string $needle e.g. {id}
      * @return $this
      */
     public function setFieldNeedle($field, $needle)
@@ -68,6 +69,14 @@ class QueryBuilder
         $this->fieldNeedles[$field] = $needle;
 
         return $this;
+    }
+
+    /**
+     * @return array
+     */
+    public function getFieldNeedles()
+    {
+        return $this->fieldNeedles;
     }
 
     /**
@@ -103,6 +112,19 @@ class QueryBuilder
     }
 
     /**
+     * @param array $bindings
+     * @return QueryBuilder
+     */
+    public function whereFields($bindings)
+    {
+        foreach ($bindings as $filed => $value) {
+            $this->whereIn($filed, [$value]);
+        }
+
+        return $this;
+    }
+
+    /**
      * @param $field string
      * @param string[] $values
      * @return $this
@@ -127,7 +149,7 @@ class QueryBuilder
             throw new Exception('whereBetween parameters must be integer');
         }
 
-        if ($range[1] <  $range[0]) {
+        if ($range[1] < $range[0]) {
             throw new Exception('whereBetween up bound must be greater than or equal to low bound');
         }
 

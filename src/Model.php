@@ -13,8 +13,8 @@ namespace Limen\Redisun;
 use Exception;
 use Limen\Redisun\Commands\Command;
 use Limen\Redisun\Commands\Factory;
+use \Illuminate\Support\Facades\Redis;
 use Limen\Redisun\Commands\FactoryInterface;
-use Predis\Client as RedisClient;
 
 /**
  * CRUD model for redis
@@ -66,6 +66,11 @@ abstract class Model
     protected $fieldWrapper = '{}';
 
     /**
+     * @var array
+     */
+    protected $columns = ['*'];
+
+    /**
      * @var QueryBuilder
      */
     protected $queryBuilder;
@@ -99,7 +104,7 @@ abstract class Model
     protected $listPushMethod = 'rpush';
 
     /**
-     * @var RedisClient
+     * @var \Predis\Client
      */
     protected $redClient;
 
@@ -114,9 +119,9 @@ abstract class Model
      */
     private $orderByFieldIndices = [];
 
-    public function __construct($parameters = null, $options = null)
+    public function __construct()
     {
-        $this->initRedisClient($parameters, $options);
+        $this->initRedisClient();
         $this->newQuery();
         $this->setCommandFactory();
     }
@@ -167,16 +172,66 @@ abstract class Model
     }
 
     /**
+     * @return array
+     */
+    public function getFieldNeedles()
+    {
+        return array_keys($this->queryBuilder->getFieldNeedles());
+    }
+
+    /**
+     * @param array $data
+     * @return mixed
+     */
+    public function getOriginModel($data = [])
+    {
+        $class = str_replace('RedisModels', 'Models', get_class($this));
+        $model = new $class();
+
+        foreach ($data as $k => $value) {
+            if ($this->columns == ['*'] || in_array($k, $this->columns)) $model[$k] = $value;
+        }
+
+        return $model;
+    }
+
+    /**
+     * @param array $columns
+     * @return $this
+     */
+    public function select($columns = ['*'])
+    {
+        $this->columns = is_array($columns) ? $columns : [$columns];
+
+        return $this;
+    }
+
+    /**
      * Query like database
      * The {$bindingKey} part in the key representation would be replace by $value
      * @param $field string
      * @param $value string
      * @return $this
      */
-    public function where($field, $value)
+    public function where(... $arg)
     {
+        if (count($arg) == 2) {
+            list($field, $value) = $arg;
+        } elseif (count($arg) == 3) {
+            list($field, $equal, $value) = $arg;
+        } else {
+            throw new Exception('Argments count error');
+        }
         $this->queryBuilder->whereEqual($field, $value);
 
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function onWriteConnection()
+    {
         return $this;
     }
 
@@ -241,9 +296,14 @@ abstract class Model
      * Retrieve items
      * @return array
      */
-    public function get()
+    public function get($origin_key = false)
     {
-        $data = $this->getProxy();
+        $data = collect();
+
+        foreach ($this->getProxy() as $k => $item) {
+            $item = $this->getOriginModel($item);
+            $origin_key ? $data[$k] = $item : $data[] = $item;
+        }
 
         return $data;
     }
@@ -364,21 +424,28 @@ abstract class Model
     {
         $items = $this->take(1)->get();
 
-        return $items ? array_shift($items) : null;
+        return $items ? $items->shift() : null;
+    }
+
+    public function lists($field)
+    {
+        return $this->get()->pluck($field);
     }
 
     /**
      * Create an item
-     * @param $id int|string Primary key
+     * @param $fields array
      * @param $value mixed
      * @param int $ttl
      * @param bool|null check key exists or not before create, not check if null
      * @return bool
      */
-    public function create($id, $value, $ttl = null, $exists = null)
+    public function create($fields, $value, $ttl = null, $exists = null)
     {
         $this->newQuery();
-        $queryKey = $this->queryBuilder->whereEqual($this->primaryFieldName, $id)->firstQueryKey();
+
+        $queryKey = $this->queryBuilder->whereFields($fields)->firstQueryKey();
+
         if (!$this->isCompleteKey($queryKey)) {
             return false;
         }
@@ -467,20 +534,7 @@ abstract class Model
      */
     public function find($id)
     {
-        $this->newQuery();
-
-        $this->queryBuilder->whereEqual($this->primaryFieldName, $id);
-
-        $queryKey = $this->queryBuilder->firstQueryKey();
-
-        if (!$this->isCompleteKey($queryKey)) {
-            return null;
-        }
-
-        list($method, $parameters) = $this->getFindMethodAndParameters();
-
-        array_unshift($parameters, $queryKey);
-        $value = call_user_func_array([$this->redClient, $method], $parameters);
+        $value = $this->where('id', $id)->first();
 
         return $value;
     }
@@ -687,13 +741,10 @@ abstract class Model
 
     /**
      * Initialize redis client
-     *
-     * @param $parameters
-     * @param $options
      */
-    protected function initRedisClient($parameters, $options)
+    protected function initRedisClient()
     {
-        $this->redClient = new RedisClient($parameters, $options);
+        $this->redClient = Redis::connection();
     }
 
     /**
@@ -755,6 +806,7 @@ abstract class Model
      * @param $value
      * @param null $ttl
      * @param null|bool $exists
+     * @throws
      * @return bool
      */
     protected function insertProxy($key, $value, $ttl = null, $exists = null)
@@ -785,6 +837,7 @@ abstract class Model
      * @param $keys
      * @param $value
      * @param int $ttl ttl in second
+     * @throws
      * @return bool
      */
     protected function updateBatchProxy($keys, $value, $ttl = null)
@@ -806,6 +859,7 @@ abstract class Model
 
     /**
      * @param $queryKeys
+     * @throws
      * @return array
      */
     protected function getProxy($queryKeys = null)
@@ -953,6 +1007,7 @@ abstract class Model
      * Get existed keys in redis database
      *
      * @param $queryKeys
+     * @throws
      * @return array|mixed
      */
     protected function getExistKeys($queryKeys)
@@ -974,6 +1029,7 @@ abstract class Model
 
     /**
      * @param Command $command
+     * @throws
      * @return mixed
      */
     protected function executeCommand($command)
@@ -1152,7 +1208,7 @@ abstract class Model
     private function isUnboundField($part)
     {
         return $this->fieldWrapper[0] === $part[0]
-        && $this->fieldWrapper[1] === $part[strlen($part) - 1];
+            && $this->fieldWrapper[1] === $part[strlen($part) - 1];
     }
 
     /**
